@@ -1,0 +1,3 @@
+[deploy]
+startCommand = "python harvest_auto.py"
+cronSchedule = "0 0 * * *"
