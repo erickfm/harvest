@@ -1,3 +1,4 @@
 [deploy]
 startCommand = "python harvest_auto.py"
-cronSchedule = "0 0 * * *"
+cronSchedule = "23 16 * * 1-5"
+restartPolicyType = "NEVER"

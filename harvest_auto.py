@@ -51,17 +51,30 @@ def is_workday(date: datetime.date) -> bool:
     return True
 
 
+def request(method: str, path: str, **kwargs) -> requests.Response:
+    """Request with timeout and retry on transient failures (429/5xx/network)."""
+    for attempt in range(3):
+        try:
+            resp = requests.request(method, f"{BASE_URL}{path}", headers=HEADERS, timeout=30, **kwargs)
+        except requests.RequestException as exc:
+            log(f"Request failed ({exc}) — retrying in 60s")
+            time.sleep(60)
+            continue
+        if resp.status_code == 429 or resp.status_code >= 500:
+            log(f"Got {resp.status_code} — retrying in 60s")
+            time.sleep(60)
+            continue
+        return resp
+    log("Giving up after 3 attempts")
+    sys.exit(1)
+
+
 def entry_exists(date: str) -> bool:
-    resp = requests.get(
-        f"{BASE_URL}/time_entries",
-        headers=HEADERS,
-        params={"from": date, "to": date},
-    )
+    """True if the date already has any time logged — including vacation or
+    manual entries on other projects, which the sweep must not stack onto."""
+    resp = request("GET", "/time_entries", params={"from": date, "to": date})
     resp.raise_for_status()
-    for entry in resp.json().get("time_entries", []):
-        if entry["project"]["id"] == PROJECT_ID and entry["task"]["id"] == TASK_ID:
-            return True
-    return False
+    return len(resp.json().get("time_entries", [])) > 0
 
 
 def create_entry(date: str, dry_run: bool = False) -> None:
@@ -76,17 +89,14 @@ def create_entry(date: str, dry_run: bool = False) -> None:
         log(f"DRY RUN — would POST: {json.dumps(payload)}")
         return
 
-    resp = requests.post(
-        f"{BASE_URL}/time_entries",
-        headers=HEADERS,
-        json=payload,
-    )
+    resp = request("POST", "/time_entries", json=payload)
     if resp.status_code == 201:
         log(f"Created {HOURS}h entry for {date}")
-    elif resp.status_code == 429:
-        log("Rate limited — retrying in 60s")
-        time.sleep(60)
-        create_entry(date, dry_run)
+    elif resp.status_code == 422:
+        log(f"Error 422: {resp.text}")
+        log("Project/task assignment is likely stale — check HARVEST_PROJECT_ID/HARVEST_TASK_ID "
+            "against GET /v2/users/me/project_assignments")
+        sys.exit(1)
     else:
         log(f"Error {resp.status_code}: {resp.text}")
         sys.exit(1)
@@ -103,14 +113,15 @@ def main() -> None:
 
     if args.backfill:
         start_date = datetime.date.fromisoformat(args.backfill)
-        dates = []
-        d = start_date
-        while d <= end_date:
-            if is_workday(d):
-                dates.append(d)
-            d += datetime.timedelta(days=1)
     else:
-        dates = [end_date]
+        # Self-heal: sweep the last two weeks so a crashed run can't drop a day for good.
+        start_date = end_date - datetime.timedelta(days=14)
+    dates = []
+    d = start_date
+    while d <= end_date:
+        if is_workday(d):
+            dates.append(d)
+        d += datetime.timedelta(days=1)
 
     for d in dates:
         date_str = d.isoformat()
