@@ -1,2 +1,5 @@
 requests
 python-dotenv
+anthropic
+icalendar
+recurring-ical-events

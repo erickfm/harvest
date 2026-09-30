@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.erick.harvest-notes</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/erick/projects/harvest/.venv/bin/python</string>
+    <string>/Users/erick/projects/harvest/harvest_auto.py</string>
+    <string>--notes-only</string>
+  </array>
+  <key>WorkingDirectory</key>
+  <string>/Users/erick/projects/harvest</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>/Users/erick/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+    <key>HOME</key>
+    <string>/Users/erick</string>
+  </dict>
+  <!-- 23:30 local daily. If the Mac is asleep, launchd runs it at next wake, and the
+       14-day sweep means a missed day is filled on the next run anyway. -->
+  <key>StartCalendarInterval</key>
+  <dict>
+    <key>Hour</key>
+    <integer>23</integer>
+    <key>Minute</key>
+    <integer>30</integer>
+  </dict>
+  <key>StandardOutPath</key>
+  <string>/Users/erick/projects/harvest/harvest.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/erick/projects/harvest/harvest.log</string>
+</dict>
+</plist>

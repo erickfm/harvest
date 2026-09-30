@@ -1,4 +1,6 @@
 [deploy]
-startCommand = "python harvest_auto.py"
+# Railway only creates the blank 8h entries (its cron is UTC: 16:23 UTC = ~09:23 Pacific).
+# Notes are filled by the launchd job on the Mac, which has the real work signals.
+startCommand = "python harvest_auto.py --no-notes"
 cronSchedule = "23 16 * * 1-5"
 restartPolicyType = "NEVER"
