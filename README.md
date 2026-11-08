@@ -61,5 +61,36 @@ Env knobs: see `.env.example` (`HARVEST_DEFAULT_NOTE`, `HARVEST_PROJECT_CONTEXT`
   "<year> Vacation/Sick/Holiday Hours → Scheduled Vacation/Day Off" instead of Gradient Routing.
 - Entries on other projects (PTO, holidays) are never touched. `holidays.json` skips dates
   for entry creation.
+- Only *your* entries are read: `fetch_entries` filters `/time_entries` by your user id (from
+  `/users/me`). Without this, a manager-role token sees the whole team; see the incident below.
 - If the Mac is off for more than 14 days, those days stay blank rather than getting a made-up
   note; run `--backfill` when it's back.
+
+## Incident: teammates' entries counted as mine (fixed 2026-11-08)
+
+**What changed.** Around 2026-11-05 my Harvest role became `project_manager`. With that role,
+`GET /v2/time_entries` returns every user's entries (25 people), not just mine. The script never
+filtered by user, and `is_ours()` only checks project + task, so any teammate's Gradient Routing
+entry looked like mine.
+
+**What broke.**
+- Railway skipped creating my entry on any day a teammate had already logged (→ 2026-11-06 had no entry).
+- The nightly notes job saw a teammate's notes and called my blank day done (→ 2026-11-05 stayed blank).
+- The nightly job tried to write my generated notes onto teammates' blank entries (Diogo's
+  2026-10-22/23/26). It was only stopped because October was invoiced and locked: every PATCH
+  returned 422 and the run exited. Checked afterwards: no teammate entry had been changed. Once the
+  locked October days left the 14-day window, it would have started overwriting unlocked
+  November entries.
+
+**Fix.** `fetch_entries` looks up my id with `GET /v2/users/me`, passes `user_id` to
+`/time_entries`, and also drops any returned entry whose `user.id` isn't mine, in case the
+filter is ever ignored. Backfilled with `harvest_auto.py --backfill 2026-11-05 --date 2026-11-06`
+(created 11-06, filled 11-05's notes). Sep 1 to Nov 6 now has an 8h entry with notes on every weekday.
+
+**How to spot it next time.** `harvest.log` showing `Error 422 … invoiced and locked` for a
+day you already filled, or a day logged as "already logged with notes" when Harvest shows it
+blank. Quick check of what Harvest really holds for me:
+
+```bash
+.venv/bin/python -c "import datetime, harvest_auto as h; [print(d, [(e['hours'], (e['notes'] or 'BLANK')[:60]) for e in es]) for d, es in sorted(h.fetch_entries(datetime.date(2026,11,1), datetime.date.today()).items())]"
+```

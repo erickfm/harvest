@@ -133,16 +133,29 @@ def request(method: str, path: str, **kwargs) -> requests.Response:
     sys.exit(1)
 
 
+def my_user_id() -> int:
+    resp = request("GET", "/users/me")
+    resp.raise_for_status()
+    return resp.json()["id"]
+
+
 def fetch_entries(start: datetime.date, end: datetime.date) -> dict[str, list[dict]]:
-    """All of my time entries in [start, end], grouped by spent_date (any project)."""
+    """All of my time entries in [start, end], grouped by spent_date (any project).
+
+    Filtered by user_id: with a manager role, /time_entries returns the whole team's entries,
+    and a teammate's entry on our project/task would otherwise look like ours."""
+    user_id = my_user_id()
     by_date: dict[str, list[dict]] = {}
     page = 1
     while True:
         resp = request("GET", "/time_entries",
-                       params={"from": start.isoformat(), "to": end.isoformat(), "per_page": 100, "page": page})
+                       params={"user_id": user_id, "from": start.isoformat(), "to": end.isoformat(),
+                               "per_page": 100, "page": page})
         resp.raise_for_status()
         data = resp.json()
         for e in data.get("time_entries", []):
+            if e["user"]["id"] != user_id:  # belt and braces if the filter is ever ignored
+                continue
             by_date.setdefault(e["spent_date"], []).append(e)
         if not data.get("next_page"):
             return by_date
