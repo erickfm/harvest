@@ -1,0 +1,5 @@
+.env
+.venv/
+harvest.log
+__pycache__/
+*.pyc

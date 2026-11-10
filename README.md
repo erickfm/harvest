@@ -35,6 +35,17 @@ Meetings: Erick / Stijn, GR - Vectoring, Gradient Routing Sync Up.
 Every source is optional. A missing or failing one is logged and skipped; the 8h entry is never
 blocked. A day with no signal at all gets `HARVEST_DEFAULT_NOTE`.
 
+## Deploying to Railway
+
+Railway does **not** auto-deploy from GitHub, so pushing to `main` changes nothing there. After any
+code change, deploy from this folder:
+
+```bash
+railway run .venv/bin/python harvest_auto.py --no-notes --dry-run   # new code, Railway's env vars, no writes
+railway up --detach                                                  # upload + deploy (.railwayignore keeps .env/.venv out)
+railway deployment list | head -3                                    # confirm SUCCESS
+```
+
 ## Day-to-day
 
 Nothing. Check `harvest.log` if curious. Useful commands:
@@ -86,6 +97,11 @@ entry looked like mine.
 `/time_entries`, and also drops any returned entry whose `user.id` isn't mine, in case the
 filter is ever ignored. Backfilled with `harvest_auto.py --backfill 2026-11-05 --date 2026-11-06`
 (created 11-06, filled 11-05's notes). Sep 1 to Nov 6 now has an 8h entry with notes on every weekday.
+
+**Follow-up, 2026-11-10.** Pushing the fix didn't reach Railway: its last deploy was 2026-07-14, so
+it was still running the July code (none of the September commits either), and it skipped 11-09 and
+11-10 as "already has an entry" because of teammates' entries. Deployed with `railway up` (see
+*Deploying to Railway*), created 11-09 with notes and 11-10 blank (filled by the nightly job).
 
 **How to spot it next time.** `harvest.log` showing `Error 422 … invoiced and locked` for a
 day you already filled, or a day logged as "already logged with notes" when Harvest shows it
